@@ -1,0 +1,6 @@
+PyQt6
+pywin32
+PyVista
+pystray
+pillow
+mss
