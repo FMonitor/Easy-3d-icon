@@ -8,8 +8,8 @@
       <env name="PYTHONUNBUFFERED" value="1" />
     </envs>
     <option name="SDK_HOME" value="" />
-    <option name="SDK_NAME" value="Python 3.10 (Eazy-3d-icon)" />
-    <option name="WORKING_DIRECTORY" value="C:\Users\86137\Desktop\TempWorkspace\codefile\Python\Eazy-3d-icon\easy3dicon" />
+    <option name="SDK_NAME" value="Python 3.13 (Easy-3d-icon)" />
+    <option name="WORKING_DIRECTORY" value="D:\Easy-3d-icon" />
     <option name="IS_MODULE_SDK" value="false" />
     <option name="ADD_CONTENT_ROOTS" value="true" />
     <option name="ADD_SOURCE_ROOTS" value="true" />

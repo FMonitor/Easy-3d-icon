@@ -1,71 +1,109 @@
 import cv2
 import numpy as np
 import pyvista as pv
+from easy3dicon.generate_texture import generate_texture
 
+def remove_transparent_rows_cols(image):
+    # Separate the Alpha channel (transparency)
+    alpha_channel = image[:, :, 3]
+    # Find rows and columns that are not completely transparent
+    non_transparent_rows = np.any(alpha_channel != 0, axis=1)
+    non_transparent_cols = np.any(alpha_channel != 0, axis=0)
+    # Remove completely transparent rows and columns
+    return image[non_transparent_rows][:, non_transparent_cols]
+
+def fill_transparent_areas(image, dominant_color):
+    # Separate the Alpha channel (transparency)
+    alpha_channel = image[:, :, 3]
+    # Create a filled version of the image
+    filled_image = image.copy()
+    # Fill transparent areas with the dominant color
+    filled_image[alpha_channel == 0] = [*dominant_color, 255]
+    return filled_image
+
+def generate_texture_coordinates(mesh):
+    # Get the bounds of the mesh
+    bounds = mesh.bounds
+    x_min, x_max, y_min, y_max, _, _ = bounds
+
+    # Normalize x and y coordinates to the range 0-1
+    x = (mesh.points[:, 0] - x_min) / (x_max - x_min)
+    y = (mesh.points[:, 1] - y_min) / (y_max - y_min)
+
+    # Stack x and y coordinates to create texture coordinates
+    texcoords = np.column_stack((x, y))
+
+    # Add texture coordinates to the mesh
+    mesh.active_t_coords = texcoords
+    return mesh
 
 def extract_and_extrude(icon_path, thickness=0.1):
-    # 读取图像（带 Alpha 通道）
+    # Read the image (with Alpha channel)
     image = cv2.imread(icon_path, cv2.IMREAD_UNCHANGED)
 
     if image is None:
-        raise FileNotFoundError(f"无法找到文件: {icon_path}")
+        raise FileNotFoundError(f"File not found: {icon_path}")
 
-    # 分离 Alpha 通道（透明度）
+    # Remove completely transparent rows and columns
+    image = remove_transparent_rows_cols(image)
+
+    # Separate the Alpha channel (transparency)
     alpha_channel = image[:, :, 3]
 
-    # 二值化处理，将透明部分变为黑色，非透明部分为白色
+    # Binarize the image, making transparent parts black and non-transparent parts white
     _, binary = cv2.threshold(alpha_channel, 1, 255, cv2.THRESH_BINARY)
 
-    # 使用 OpenCV 找轮廓，确保闭合和完整性
+    # Find contours
     contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
+    # Convert contours to 3D vertices and create a plane
     meshes = []
-
     for contour in contours:
-        # 转换轮廓为浮点数
-        contour = contour.astype(float)
+        if len(contour) < 3:
+            continue
 
-        # 构造 2D 多边形点集
-        points = np.column_stack((contour[:, 0, 0], contour[:, 0, 1], np.zeros(contour.shape[0])))
+        # Convert contour to 2D vertices
+        points = np.array([[x, y] for [[x, y]] in contour], dtype=float)
 
-        # 创建 PyVista PolyData 对象
+        # Add Z axis to form a 3D polygon on the plane
+        points = np.column_stack((points, np.zeros(points.shape[0])))
+
+        # Create PyVista PolyData object and generate 2D plane
         base = pv.PolyData(points)
         base = base.delaunay_2d()
 
-        # 拉伸成 3D 模型
+        # Extrude to form a 3D model
         extruded = base.extrude((0, 0, thickness))
 
-        # 创建顶部和底部封盖
+        # Create top and bottom caps
         bottom = base
-        top = pv.PolyData(points + [0, 0, thickness])
-        top = top.delaunay_2d()
+        top = pv.PolyData(points + [0, 0, thickness]).delaunay_2d()
 
-        # 合并底面、拉伸部分和顶面
+        # Combine the extruded model, bottom, and top
         meshes.append(pv.MultiBlock([extruded, bottom, top]).combine())
 
-    # 合并所有轮廓生成的模型
+    # Combine all small models into one
     combined = pv.MultiBlock(meshes).combine()
 
-    # 归一化模型尺寸，确保纹理贴合
-    bounds = combined.bounds
-    x_min, x_max, y_min, y_max, _, _ = bounds
-    combined.points[:, 0] = (combined.points[:, 0] - x_min) / (x_max - x_min)
-    combined.points[:, 1] = (combined.points[:, 1] - y_min) / (y_max - y_min)
+    # Generate texture coordinates for the combined mesh
+    combined = generate_texture_coordinates(combined)
 
-    # 加载图标作为纹理
-    texture = pv.Texture(icon_path)
+    generate_texture(icon_path)
 
-    # 确保 combined 有统一的纹理坐标
-    combined.active_texture_coordinates = combined.points[:, :2]
+    # Load the filled icon as a texture
+    texture = pv.Texture('filled_temp.png')
 
-    # 渲染模型，应用纹理
+    # Render the model with the filled texture
     plotter = pv.Plotter()
-    plotter.add_mesh(combined, texture=texture, show_edges=True)
+    plotter.add_mesh(combined, texture=texture, show_edges=False)
+
     plotter.add_axes()
     plotter.show_bounds()
     plotter.set_background('white')
     plotter.show()
 
+def render_3d_model(path, thickness):
+    extract_and_extrude(path, thickness)
 
-# 调用函数测试
-extract_and_extrude('temp.png', 0.3)
+if __name__ == '__main__':
+    render_3d_model('temp.png', 100)

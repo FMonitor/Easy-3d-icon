@@ -12,9 +12,9 @@ class Icon3DGenerator(QMainWindow):
         self.icon_path = None
         self.setWindowTitle('3D 图标生成器')
         self.setGeometry(100, 100, 800, 600)
-        self.initUI()
+        self.initui()
 
-    def initUI(self):
+    def initui(self):
         layout = QVBoxLayout()
 
         self.label = QLabel('请选择一个文件（PNG、快捷方式、EXE）')
@@ -41,7 +41,8 @@ class Icon3DGenerator(QMainWindow):
     def generate_3d_icon(self):
         if self.file_path:
             self.icon_path = extract_icon(self.file_path)
+            print(self.file_path)
         if not hasattr(self, 'icon_path') or not self.icon_path:
             self.label.setText('请先选择一个有效的文件！')
             return
-        render_3d_model(self.icon_path,0.3)
+        render_3d_model(self.icon_path,100)
